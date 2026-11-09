@@ -39,10 +39,7 @@ public class WebMindMappingScanner implements SmartInitializingSingleton {
         Map<String, Object> controllers = applicationContext.getBeansWithAnnotation(Controller.class);
 
         for (Map.Entry<String, Object> entry : controllers.entrySet()) {
-            String beanName = entry.getKey();
-
-            log.debug("Webmind APIDoc: {}", beanName);
-            scanController(beanName, entry.getValue());
+            scanController(entry.getKey(), entry.getValue());
         }
     }
 
