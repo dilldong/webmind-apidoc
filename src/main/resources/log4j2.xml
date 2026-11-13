@@ -2,7 +2,7 @@
 <Configuration status="WARN">
     <properties>
         <property name="logPath" value="logs"/>
-        <property name="logFile" value="webmind.log"/>
+        <property name="logFile" value="apidoc.log"/>
         <property name="log.project" value="org.webmind.apidoc"/>
         <property name="log.project.level" value="debug"/>
     </properties>
