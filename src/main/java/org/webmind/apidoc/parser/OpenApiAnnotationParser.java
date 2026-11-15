@@ -216,10 +216,14 @@ public class OpenApiAnnotationParser {
         for (Annotation context : contextAnnotations) {
             if (!(context instanceof io.swagger.v3.oas.annotations.Parameter)) annotations.add(context);
         }
-        if (type == null) type = ParameterProcessor.getParameterType(annotation);
+
+        if (type == null)
+            type = ParameterProcessor.getParameterType(annotation);
+
         Schema<?> previousSchema = existing == null ? null : existing.getSchema();
         Content previousContent = existing == null ? null : existing.getContent();
         Components local = new Components();
+
         // Swagger 负责参数元数据；类型与 Content 仍由本项目统一按 3.1 处理。
         Parameter parameter = ParameterProcessor.applyAnnotations(existing, type, annotations, local, null, null, null, true);
         if (parameter.get$ref() != null) return parameter;
