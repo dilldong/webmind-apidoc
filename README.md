@@ -107,8 +107,3 @@ public OpenAPI openApiDefinition() {
 }
 ```
 
-## 验证
-
-```shell
-mvn test
-```

@@ -1,17 +1,16 @@
 package org.webmind.apidoc.resolver;
 
 import io.swagger.v3.oas.models.PathItem;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.mind.framework.util.MatcherUtils;
 import org.webmind.apidoc.scanner.MappingMetadata;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -30,37 +29,17 @@ public class WebMindRouteResolver {
     private static final Pattern VARIABLE_NAME = Pattern.compile("[\\p{L}\\p{N}_.-]+");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{[^/{}]+}");
 
-    /** 展开所有映射，校验全局路由冲突，并提供稳定的生成顺序。 */
+    /**
+     * 展开所有映射，校验全局路由冲突，并提供稳定的生成顺序。
+     */
     public List<ResolvedRoute> resolve(List<MappingMetadata> mappings) {
-        List<ResolvedRoute> routes = mappings.stream()
+        return mappings.stream()
                 .flatMap(mapping -> resolve(mapping).stream())
                 .sorted(Comparator.comparing(ResolvedRoute::path)
                         .thenComparing(route -> route.httpMethod().name())
-                        .thenComparing(route -> route.mapping().beanName())
-                        .thenComparing(route -> route.mapping().method().toGenericString()))
+                        .thenComparing(route -> route.metadata().beanName())
+                        .thenComparing(route -> route.metadata().method().toGenericString()))
                 .toList();
-
-        Map<String, MappingMetadata> uriOwners = new HashMap<>();
-        Map<String, String> pathShapes = new HashMap<>();
-        for (ResolvedRoute route : routes) {
-            // WebMind 的 URI/正则键全局唯一，不以 HTTP Method 区分。
-            String uriKey = MatcherUtils.convertURIIfExists(route.originalPath());
-            MappingMetadata owner = uriOwners.putIfAbsent(uriKey, route.mapping());
-            if (owner != null && (!owner.beanName().equals(route.mapping().beanName())
-                    || !owner.method().equals(route.mapping().method()))) {
-                throw new IllegalArgumentException("Duplicate WebMind URI " + route.originalPath()
-                        + " on " + owner.method().toGenericString() + " and "
-                        + route.mapping().method().toGenericString());
-            }
-
-            String shape = PATH_VARIABLE.matcher(route.path()).replaceAll("{}");
-            String existing = pathShapes.putIfAbsent(shape, route.path());
-            if (existing != null && !existing.equals(route.path())) {
-                throw new IllegalArgumentException("Equivalent OpenAPI path templates use different variable names: "
-                        + existing + " and " + route.path());
-            }
-        }
-        return routes;
     }
 
     /**
@@ -69,23 +48,21 @@ public class WebMindRouteResolver {
      * @throws IllegalArgumentException 路由无法表达为 OpenAPI 路径，或与方法参数不匹配
      */
     public List<ResolvedRoute> resolve(MappingMetadata mapping) {
-        Objects.requireNonNull(mapping, "mapping must not be null");
-        Objects.requireNonNull(mapping.method(), "mapping.method must not be null");
+        Objects.requireNonNull(mapping, "metadata must not be null");
+        Objects.requireNonNull(mapping.method(), "metadata.method must not be null");
 
-        if (mapping.pathArray() == null || mapping.pathArray().length == 0) {
+        if (ArrayUtils.isEmpty(mapping.originalPath()))
             throw invalid(mapping, null, "at least one path is required");
-        }
-        if (mapping.httpMethods() == null || mapping.httpMethods().length == 0) {
+
+        if (ArrayUtils.isEmpty(mapping.httpMethods()))
             throw invalid(mapping, null, "at least one HTTP method is required");
-        }
 
         Set<ResolvedRoute> routes = new LinkedHashSet<>();
-        for (String originalPath : mapping.pathArray()) {
+        for (String originalPath : mapping.originalPath()) {
             ParsedPath parsed = parsePath(mapping, originalPath);
             for (String method : mapping.httpMethods()) {
                 PathItem.HttpMethod httpMethod = parseHttpMethod(mapping, originalPath, method);
-                routes.add(new ResolvedRoute(mapping, originalPath, parsed.path(),
-                        httpMethod, parsed.variables()));
+                routes.add(new ResolvedRoute(mapping, parsed.path(), httpMethod, parsed.variables()));
             }
         }
         return List.copyOf(routes);
@@ -133,9 +110,9 @@ public class WebMindRouteResolver {
     }
 
     private PathItem.HttpMethod parseHttpMethod(MappingMetadata mapping, String path, String method) {
-        if (method != null) {
+        if (StringUtils.isNotEmpty(method)) {
             try {
-                return PathItem.HttpMethod.valueOf(method.toUpperCase(Locale.ROOT));
+                return PathItem.HttpMethod.valueOf(method);
             } catch (IllegalArgumentException ignored) {
                 // Include the originating Java method in the actionable error below.
             }
@@ -148,15 +125,18 @@ public class WebMindRouteResolver {
                 + mapping.method().toGenericString() + ": " + reason);
     }
 
-    /** One operation in an application-relative OpenAPI path. */
-    public record ResolvedRoute(MappingMetadata mapping,
-                                String originalPath,
+    /**
+     * One operation in an application-relative OpenAPI path.
+     */
+    public record ResolvedRoute(MappingMetadata metadata,
                                 String path,
                                 PathItem.HttpMethod httpMethod,
                                 List<PathVariable> pathVariables) {
     }
 
-    /** The zero-based method parameter index follows placeholder order in the URI. */
+    /**
+     * The zero-based method parameter index follows placeholder order in the URI.
+     */
     public record PathVariable(String name, int parameterIndex) {
     }
 

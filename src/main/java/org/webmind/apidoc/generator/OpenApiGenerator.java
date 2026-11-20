@@ -13,9 +13,12 @@ import java.util.Objects;
 
 /**
  * 创建文档，序列化并缓存 JSON；启动流程由 WebMindMappingScanner 负责。
+ * @author marcus
+ * @version 1.0
+ * @date 2026/11/8
  */
 public class OpenApiGenerator {
-    private final String API_VERSION = "3.1.0";
+    private static final String API_VERSION = "3.1.0";
     private final String definitionJson;
     private volatile String cachedJson;
 
@@ -45,6 +48,7 @@ public class OpenApiGenerator {
         if (document.getPaths() == null)
             document.setPaths(new Paths());
 
+        // 全局 OpenAPI 组件库（用于收纳复用的 Schema、Responses 等，支持 $ref 引用）
         if (document.getComponents() == null)
             document.setComponents(new Components());
 
@@ -62,7 +66,8 @@ public class OpenApiGenerator {
 
     public String getJson() {
         String json = cachedJson;
-        if (json == null) throw new IllegalStateException("OpenAPI document has not been generated yet");
+        if (StringUtils.isEmpty(json))
+            throw new IllegalStateException("OpenAPI document has not been generated yet");
         return json;
     }
 
@@ -83,7 +88,10 @@ public class OpenApiGenerator {
 
     private static OpenAPI deserialize(String json) {
         try {
-            return Json31.mapper().readValue(json, OpenAPI.class).specVersion(SpecVersion.V31).openapi(API_VERSION);
+            return Json31.mapper()
+                    .readValue(json, OpenAPI.class)
+                    .specVersion(SpecVersion.V31)
+                    .openapi(API_VERSION);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Unable to read OpenAPI 3.1 document", e);
         }

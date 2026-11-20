@@ -4,18 +4,18 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.Strings;
+import org.apache.commons.lang3.StringUtils;
 import org.mind.framework.annotation.Mapping;
-import org.mind.framework.util.ReflectionUtils;
+import org.mind.framework.cache.AbstractCache;
 import org.mind.framework.web.container.spring.SpringContainerAware;
 import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.ReflectionUtils;
 import org.webmind.apidoc.generator.OpenApiGenerator;
 import org.webmind.apidoc.parser.OpenApiAnnotationParser;
 import org.webmind.apidoc.resolver.WebMindRouteResolver;
-import org.webmind.apidoc.resolver.WebMindRouteResolver.ResolvedRoute;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.StringJoiner;
 
 /**
  * 启动时发现 Controller Bean 和 @Mapping Method
@@ -35,68 +36,61 @@ import java.util.Set;
 @Slf4j
 public class WebMindMappingScanner implements SmartInitializingSingleton {
     private final ApplicationContext applicationContext;
-    private final WebMindRouteResolver routeResolver;
     private final OpenApiAnnotationParser annotationParser;
+    private final WebMindRouteResolver routeResolver;
     private final OpenApiGenerator generator;
-    private final List<MappingOperationMetadata> mappings = new ArrayList<>();
+    private final List<MappingMetadata> mappings;
 
     public WebMindMappingScanner(ApplicationContext applicationContext,
-                                 WebMindRouteResolver routeResolver,
                                  OpenApiAnnotationParser annotationParser,
+                                 WebMindRouteResolver routeResolver,
                                  OpenApiGenerator generator) {
+
+        this.mappings = new ArrayList<>(64);
         this.applicationContext = applicationContext;
-        this.routeResolver = routeResolver;
         this.annotationParser = annotationParser;
+        this.routeResolver = routeResolver;
         this.generator = generator;
     }
 
     @Override
     public void afterSingletonsInstantiated() {
-        // 1. 扫描 Controller 的 @Mapping。
-        mappings.clear();
+        // 1. 扫描 Controller 的 @Mapping
         applicationContext.getBeansWithAnnotation(Controller.class).forEach(this::scanController);
 
-        // 2. 解析真实路由，隐藏接口不参与文档生成
-        List<ResolvedRoute> routes = routeResolver.resolve(getMappings());
+        List<MappingMetadata> metadataList = getMappings();
+        if (metadataList.isEmpty())
+            return;
 
-        // 3. 读取注解、解析参数及返回值，生成每个路径和 HTTP 方法的 Operation。
+        // 2. 解析真实路由, 读取注解、解析参数及返回值，生成每个路径和 HTTP 方法的 Operation。
+        List<WebMindRouteResolver.ResolvedRoute> routes = routeResolver.resolve(getMappings());
         OpenAPI document = generator.createDocument();
-        Set<String> operationIds = operationIds(document);
-        for (ResolvedRoute route : routes) {
-            Operation operation = annotationParser.parse(route, document.getComponents());
+        Set<String> operationIdSet = getOperationIdSet(document);
+
+        // 3. 读取 @Operation 注解、解析参数/返回值、生成 OpenAPI Operation
+        for (WebMindRouteResolver.ResolvedRoute route : routes) {
+            Operation operation = annotationParser.buildOperation(route, document.getComponents());
+            if (operation == null)
+                continue;
+
             PathItem path = document.getPaths().computeIfAbsent(route.path(), ignored -> new PathItem());
-            if (path.readOperationsMap().containsKey(route.httpMethod())) {
+            if (path.readOperationsMap().containsKey(route.httpMethod()))
                 throw new IllegalArgumentException("Duplicate OpenAPI route " + route.httpMethod() + " " + route.path());
-            }
-            operation.setOperationId(operationId(route, operation, operationIds));
+
+            operation.setOperationId(newOperationId(route, operation, operationIdSet));
             path.operation(route.httpMethod(), operation);
         }
 
         // 4. 文档组装完成后，一次性生成并缓存 JSON。
         generator.generate(document);
+
+        operationIdSet.clear();
+        mappings.clear();
+        metadataList = null;
     }
 
-    private Set<String> operationIds(OpenAPI document) {
-        Set<String> ids = new HashSet<>();
-        for (PathItem path : document.getPaths().values()) {
-            for (Operation operation : path.readOperations()) {
-                if (operation.getOperationId() != null && !ids.add(operation.getOperationId())) {
-                    throw new IllegalArgumentException("Duplicate operationId: " + operation.getOperationId());
-                }
-            }
-        }
-        return ids;
-    }
-
-    private String operationId(ResolvedRoute route, Operation operation, Set<String> ids) {
-        String base = operation.getOperationId();
-        if (base == null || base.isBlank()) {
-            base = route.mapping().controllerClass().getSimpleName() + "_" + route.mapping().method().getName()
-                    + "_" + route.httpMethod().name().toLowerCase(Locale.ROOT);
-        }
-        String id = base;
-        for (int suffix = 2; !ids.add(id); suffix++) id = base + "_" + suffix;
-        return id;
+    public List<MappingMetadata> getMappings() {
+        return List.copyOf(mappings);
     }
 
     private void scanController(String beanName, Object bean) {
@@ -121,38 +115,49 @@ public class WebMindMappingScanner implements SmartInitializingSingleton {
         if (SpringContainerAware.noneMappingMethod(method, mapping))
             return;
 
-        // 读取 @Operation 注解、解析参数/返回值、生成 OpenAPI Operation
-        Operation operation = annotationParser.buildOperation(controllerClass, method);
-        if(operation == null)
-            return;
-
-        // 路径格式转换：将 ${path} 转换成 OpenAPI 标准的 {path}
-        String[] pathArray = Arrays.stream(mapping.value())
-                .map(path -> {
-                    String value = Strings.CS.replace(path, "${", "{");
-                    return Strings.CS.replace(value, "}", "}");
-                })
-                .toArray(String[]::new);
-
         // 读取 @Mapping 中的 method
         String[] methods = Arrays.stream(mapping.method())
                 .map(Enum::name)
                 .toArray(String[]::new);
 
-        MappingOperationMetadata metadata = new MappingOperationMetadata(
+        MappingMetadata metadata = new MappingMetadata(
                 beanName,
                 controllerClass,
                 method,
-                pathArray,
+                mapping.value(),
                 methods,
-                mapping.async().value(),
-                operation
+                mapping.async().value()
         );
 
         mappings.add(metadata);
     }
 
-    public List<MappingOperationMetadata> getMappings() {
-        return List.copyOf(mappings);
+    private Set<String> getOperationIdSet(OpenAPI document) {
+        Set<String> idSet = new HashSet<>();
+        for (PathItem path : document.getPaths().values()) {
+            for (Operation operation : path.readOperations()) {
+                if (operation.getOperationId() != null && !idSet.add(operation.getOperationId()))
+                    throw new IllegalArgumentException("Duplicate operationId: " + operation.getOperationId());
+            }
+        }
+        return idSet;
+    }
+
+    private String newOperationId(WebMindRouteResolver.ResolvedRoute route, Operation operation, Set<String> ids) {
+        String base = operation.getOperationId();
+
+        if (StringUtils.isEmpty(base)) {
+            base = new StringJoiner(AbstractCache.CACHE_DELIMITER)
+                    .add(route.metadata().method().getName())
+                    .add(route.httpMethod().name().toLowerCase(Locale.ROOT))
+                    .toString();
+        }
+
+        String id = base;
+        for (int suffix = 2; !ids.add(id); ++suffix) {
+            id = base + AbstractCache.CACHE_DELIMITER + suffix;
+        }
+
+        return id;
     }
 }
