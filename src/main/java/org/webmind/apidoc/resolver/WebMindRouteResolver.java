@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
  */
 public class WebMindRouteResolver {
     private static final Pattern VARIABLE_NAME = Pattern.compile("[\\p{L}\\p{N}_.-]+");
-    private static final Pattern PATH_VARIABLE = Pattern.compile("\\{[^/{}]+}");
 
     /**
      * 展开所有映射，校验全局路由冲突，并提供稳定的生成顺序。

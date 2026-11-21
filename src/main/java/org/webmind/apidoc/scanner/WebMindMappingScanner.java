@@ -58,10 +58,6 @@ public class WebMindMappingScanner implements SmartInitializingSingleton {
         // 1. 扫描 Controller 的 @Mapping
         applicationContext.getBeansWithAnnotation(Controller.class).forEach(this::scanController);
 
-        List<MappingMetadata> metadataList = getMappings();
-        if (metadataList.isEmpty())
-            return;
-
         // 2. 解析真实路由, 读取注解、解析参数及返回值，生成每个路径和 HTTP 方法的 Operation。
         List<WebMindRouteResolver.ResolvedRoute> routes = routeResolver.resolve(getMappings());
         OpenAPI document = generator.createDocument();
@@ -86,7 +82,7 @@ public class WebMindMappingScanner implements SmartInitializingSingleton {
 
         operationIdSet.clear();
         mappings.clear();
-        metadataList = null;
+        routes = null;
     }
 
     public List<MappingMetadata> getMappings() {
