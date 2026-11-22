@@ -64,6 +64,7 @@ public class WebMindRouteResolver {
                 routes.add(new ResolvedRoute(mapping, parsed.path(), httpMethod, parsed.variables()));
             }
         }
+
         return List.copyOf(routes);
     }
 
@@ -71,10 +72,12 @@ public class WebMindRouteResolver {
         if (originalPath == null || originalPath.isBlank() || !originalPath.startsWith("/")) {
             throw invalid(mapping, originalPath, "path must start with '/' and must not be blank");
         }
+
         if (originalPath.chars().anyMatch(Character::isWhitespace)
                 || originalPath.indexOf('?') >= 0 || originalPath.indexOf('#') >= 0) {
             throw invalid(mapping, originalPath, "path must not contain whitespace, a query string or a fragment");
         }
+
         if (originalPath.indexOf('*') >= 0) {
             throw invalid(mapping, originalPath, "wildcard routes cannot be represented as an OpenAPI path");
         }
@@ -83,14 +86,17 @@ public class WebMindRouteResolver {
         StringBuilder path = new StringBuilder();
         List<PathVariable> variables = new ArrayList<>();
         Set<String> names = new HashSet<>();
+
         while (matcher.find()) {
             String name = matcher.group().substring(2, matcher.group().length() - 1);
             if (!VARIABLE_NAME.matcher(name).matches()) {
                 throw invalid(mapping, originalPath, "invalid path variable name: " + name);
             }
+
             if (!names.add(name)) {
                 throw invalid(mapping, originalPath, "duplicate path variable name: " + name);
             }
+
             variables.add(new PathVariable(name, variables.size()));
             matcher.appendReplacement(path, Matcher.quoteReplacement("{" + name + "}"));
         }
@@ -101,10 +107,12 @@ public class WebMindRouteResolver {
         if (literalPath.indexOf('{') >= 0 || literalPath.indexOf('}') >= 0) {
             throw invalid(mapping, originalPath, "unmatched braces or a non-WebMind path template");
         }
+
         if (variables.size() != mapping.method().getParameterCount()) {
             throw invalid(mapping, originalPath, "path variable count (" + variables.size()
                     + ") does not match method parameter count (" + mapping.method().getParameterCount() + ")");
         }
+
         return new ParsedPath(path.toString(), List.copyOf(variables));
     }
 
