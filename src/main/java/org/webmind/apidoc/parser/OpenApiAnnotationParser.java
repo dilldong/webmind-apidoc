@@ -11,6 +11,7 @@ import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
@@ -53,6 +54,9 @@ import java.util.stream.Collectors;
  */
 public class OpenApiAnnotationParser {
     private static final Pattern PATTERN = Pattern.compile("default|[1-5](?:[0-9]{2}|XX)");
+    private static final String PATH = "path";
+    private static final String QUERY = "query";
+    private static final String BODY = "body";
 
     // 负责处理复杂 Schema 嵌套与校验约束的解析器
     private final OpenApiSchemaResolver schemaResolver;
@@ -85,6 +89,9 @@ public class OpenApiAnnotationParser {
 
         // 解析参数 @Parameter & @Schema
         parseParameters(route, operation, operationAnn, components);
+
+        // 解析 @RequestBody
+        parseRequestBody(operationAnn.requestBody(), operation, components);
 
         // 解析返回值及 @ApiResponse
         parseResponses(route.metadata(), operation, operationAnn, components);
@@ -302,6 +309,32 @@ public class OpenApiAnnotationParser {
                 .ifPresent(content -> parameter.content(content).schema(null));
 
         return parameter;
+    }
+
+    private void parseRequestBody(io.swagger.v3.oas.annotations.parameters.RequestBody annotation,
+                                  Operation operation,
+                                  Components components) {
+
+        if (StringUtils.isNotBlank(annotation.ref())) {
+            operation.setRequestBody(new RequestBody().$ref(annotation.ref()));
+            return;
+        }
+
+        String description = StringUtils.defaultIfBlank(annotation.description(), null);
+        Map<String, Object> extensions = AnnotationsUtils.getExtensions(true, annotation.extensions());
+        if (annotation.content().length == 0 && description == null && !annotation.required() && extensions.isEmpty())
+            return;
+
+        Content content = annotationContent(annotation.content(), components)
+                .orElseGet(() -> new Content().addMediaType(
+                        org.springframework.http.MediaType.APPLICATION_JSON_VALUE, new MediaType()));
+
+        RequestBody body = new RequestBody().description(description).content(content);
+        if (annotation.required())
+            body.setRequired(true);
+
+        extensions.forEach(body::addExtension31);
+        operation.setRequestBody(body);
     }
 
     private void parseResponses(MappingMetadata mapping,

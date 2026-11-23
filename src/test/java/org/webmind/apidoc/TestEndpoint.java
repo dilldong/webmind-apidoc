@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Payload;
 import org.mind.framework.annotation.Mapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMethod;
