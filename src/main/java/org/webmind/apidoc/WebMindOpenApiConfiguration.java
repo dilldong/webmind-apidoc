@@ -5,6 +5,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.webmind.apidoc.generator.OpenApiGenerator;
 import org.webmind.apidoc.parser.OpenApiAnnotationParser;
@@ -19,6 +20,7 @@ import org.webmind.apidoc.scanner.WebMindMappingScanner;
  * @date 2026/11/8
  */
 @Configuration(proxyBeanMethods = false)
+@Conditional(OpenApiEnabledCondition.class)
 @ComponentScan(basePackages = "org.webmind.apidoc")
 public class WebMindOpenApiConfiguration {
 

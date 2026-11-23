@@ -18,6 +18,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.mind.framework.util.JsonUtils;
 import org.mind.framework.web.container.spring.SpringContainerAware;
 import org.mind.framework.web.renderer.Render;
 import org.springframework.core.GenericTypeResolver;
@@ -56,7 +57,6 @@ public class OpenApiAnnotationParser {
     private static final Pattern PATTERN = Pattern.compile("default|[1-5](?:[0-9]{2}|XX)");
     private static final String PATH = "path";
     private static final String QUERY = "query";
-    private static final String BODY = "body";
 
     // 负责处理复杂 Schema 嵌套与校验约束的解析器
     private final OpenApiSchemaResolver schemaResolver;
@@ -156,7 +156,7 @@ public class OpenApiAnnotationParser {
         MappingMetadata metadata = route.metadata();
 
         for (WebMindRouteResolver.PathVariable variable : route.pathVariables()) {
-            Parameter parameter = new Parameter().name(variable.name()).in("path").required(true);
+            Parameter parameter = new Parameter().name(variable.name()).in(PATH).required(true);
             Type type = parameterType(metadata, variable.parameterIndex());
             parameter.setSchema(schemaResolver.resolve(type, parameterAnnotations(metadata, variable.parameterIndex()), components));
             parameters.put(key(parameter), parameter);
@@ -198,7 +198,7 @@ public class OpenApiAnnotationParser {
             if (parameter.get$ref() != null)
                 throw new IllegalArgumentException("A bound path parameter cannot use @Parameter(ref): " + variable.name());
 
-            parameter.name(variable.name()).in("path").required(true);
+            parameter.name(variable.name()).in(PATH).required(true);
             parameters.put(key(parameter), parameter);
         }
 
@@ -218,12 +218,12 @@ public class OpenApiAnnotationParser {
 
         Predicate<WebMindRouteResolver.PathVariable> predicate = variable -> variable.name().equals(annotation.name());
         String in = annotation.in() == ParameterIn.DEFAULT
-                ? route.pathVariables().stream().anyMatch(predicate) ? "path" : "query"
+                ? route.pathVariables().stream().anyMatch(predicate) ? PATH : QUERY
                 : annotation.in().toString();
 
-        String parameterKey = in + ":" + annotation.name();
+        String parameterKey = in + JsonUtils.COLON_SEPARATOR + annotation.name();
         if (annotation.hidden()) {
-            if (!"path".equals(in))
+            if (!PATH.equals(in))
                 parameters.remove(parameterKey);
             return;
         }
@@ -233,10 +233,10 @@ public class OpenApiAnnotationParser {
 
         boolean noneMatch = route.pathVariables().stream().noneMatch(predicate);
 
-        if ("path".equals(in) && noneMatch)
+        if (PATH.equals(in) && noneMatch)
             throw new IllegalArgumentException("@Parameter names a path variable absent from the route: " + annotation.name());
 
-        if (type == null && "path".equals(in)) {
+        if (type == null && PATH.equals(in)) {
             WebMindRouteResolver.PathVariable variable = route.pathVariables().stream()
                     .filter(predicate)
                     .findFirst()
@@ -251,7 +251,7 @@ public class OpenApiAnnotationParser {
 
         parameter.setIn(in);
 
-        if ("path".equals(in))
+        if (PATH.equals(in))
             parameter.setRequired(true);
 
         parameters.put(key(parameter), parameter);
@@ -386,7 +386,8 @@ public class OpenApiAnnotationParser {
                     content = inferred;
                 else if (inferred != null) {
                     for (MediaType media : content.values()) {
-                        if (media.getSchema() == null) media.setSchema(inferred.values().iterator().next().getSchema());
+                        if (media.getSchema() == null)
+                            media.setSchema(inferred.values().iterator().next().getSchema());
                     }
                 }
             }
@@ -411,16 +412,28 @@ public class OpenApiAnnotationParser {
         Method method = mapping.method();
         Type type = GenericTypeResolver.resolveType(method.getGenericReturnType(), mapping.controllerClass());
         Class<?> rawType = ResolvableType.forType(type).resolve(method.getReturnType());
-        if (rawType == void.class || rawType == Void.class || Render.class.isAssignableFrom(rawType)) return null;
-        io.swagger.v3.oas.annotations.media.Schema schemaAnnotation = find(mapping, io.swagger.v3.oas.annotations.media.Schema.class);
-        Schema<?> schema = schemaResolver.resolve(type, schemaAnnotation == null ? new Annotation[0] : new Annotation[]{schemaAnnotation}, components);
-        if (schema == null) return null;
+
+        if (rawType == void.class || rawType == Void.class || Render.class.isAssignableFrom(rawType))
+            return null;
+
+        io.swagger.v3.oas.annotations.media.Schema schemaAnnotation =
+                find(mapping, io.swagger.v3.oas.annotations.media.Schema.class);
+
+        Schema<?> schema = schemaResolver.resolve(
+                type,
+                schemaAnnotation == null ? new Annotation[0] : new Annotation[]{schemaAnnotation}, components
+        );
+
+        if (schema == null)
+            return null;
+
         boolean text = rawType.isPrimitive() || rawType == String.class || rawType == Character.class
                 || rawType == Boolean.class || Number.class.isAssignableFrom(rawType);
 
         return new Content().addMediaType(
                 text ? org.springframework.http.MediaType.TEXT_HTML_VALUE : org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
-                new MediaType().schema(schema));
+                new MediaType().schema(schema)
+        );
     }
 
     private Type parameterType(MappingMetadata mapping, int index) {
@@ -432,7 +445,9 @@ public class OpenApiAnnotationParser {
     }
 
     private String key(Parameter parameter) {
-        return parameter.get$ref() == null ? parameter.getIn() + ":" + parameter.getName() : "$ref:" + parameter.get$ref();
+        return parameter.get$ref() == null ?
+                parameter.getIn() + JsonUtils.COLON_SEPARATOR + parameter.getName() :
+                "$ref:" + parameter.get$ref();
     }
 
     private <A extends Annotation> A find(MappingMetadata mapping, Class<A> annotationType) {
@@ -468,26 +483,36 @@ public class OpenApiAnnotationParser {
     }
 
     private Map<String, io.swagger.v3.oas.models.headers.Header> annotationHeaders(
-            io.swagger.v3.oas.annotations.headers.Header[] annotations, Components components) {
+            io.swagger.v3.oas.annotations.headers.Header[] annotations,
+            Components components) {
+
         Map<String, io.swagger.v3.oas.models.headers.Header> headers = new LinkedHashMap<>();
+
         for (io.swagger.v3.oas.annotations.headers.Header annotation : annotations) {
             Components local = new Components();
-            Optional<io.swagger.v3.oas.models.headers.Header> parsed = AnnotationsUtils.getHeader(annotation, local, null, true);
+            Optional<io.swagger.v3.oas.models.headers.Header> parsed =
+                    AnnotationsUtils.getHeader(annotation, local, null, true);
+
             if (parsed.isPresent() && annotation.schema().implementation() != Void.class) {
                 parsed.get().setSchema(contextualSchema(annotation.schema(), local));
             }
+
             schemaResolver.mergeComponents(local, components);
             parsed.ifPresent(value -> headers.put(annotation.name(), value));
         }
+
         return headers;
     }
 
     private Schema<?> contextualSchema(io.swagger.v3.oas.annotations.media.Schema annotation, Components utilityComponents) {
         Components canonical = new Components();
         Schema<?> schema = schemaResolver.resolve(annotation.implementation(), new Annotation[]{annotation}, canonical);
+
         // Core 的注解工具把使用处的 description 等写进共享 DTO，替换为 resolver 的标准定义。
         // 使用处的信息由返回的 3.1 $ref 兄弟字段保留，媒体示例和 encoding 不受影响。
-        if (canonical.getSchemas() != null) canonical.getSchemas().forEach(utilityComponents::addSchemas);
+        if (canonical.getSchemas() != null)
+            canonical.getSchemas().forEach(utilityComponents::addSchemas);
+
         return schema;
     }
 
@@ -512,7 +537,7 @@ public class OpenApiAnnotationParser {
             throw new IllegalArgumentException("Referenced parameter requires name and in: " + annotation.ref());
         }
 
-        if ("path".equals(referenced.getIn())) {
+        if (PATH.equals(referenced.getIn())) {
             boolean nonMatch =
                     route.pathVariables().stream()
                             .noneMatch(variable -> variable.name().equals(referenced.getName()));
@@ -528,16 +553,26 @@ public class OpenApiAnnotationParser {
 
     private Parameter referencedParameter(String ref, Components components, Set<String> visited) {
         String prefix = "#/components/parameters/";
-        if (!ref.startsWith(prefix)) return null;
-        if (!visited.add(ref)) throw new IllegalArgumentException("Circular parameter reference: " + ref);
-        String name = ref.substring(prefix.length()).replace("~1", "/").replace("~0", "~");
+        if (!ref.startsWith(prefix))
+            return null;
+
+        if (!visited.add(ref))
+            throw new IllegalArgumentException("Circular parameter reference: " + ref);
+
+        String name = ref.substring(prefix.length())
+                .replace("~1", "/")
+                .replace("~0", "~");
+
         Parameter parameter = components.getParameters() == null ? null : components.getParameters().get(name);
-        if (parameter == null) throw new IllegalArgumentException("Unknown parameter reference: " + ref);
-        return parameter.get$ref() == null ? parameter : referencedParameter(parameter.get$ref(), components, visited);
+        if (parameter == null)
+            throw new IllegalArgumentException("Unknown parameter reference: " + ref);
+
+        return parameter.get$ref() == null ?
+                parameter :
+                referencedParameter(parameter.get$ref(), components, visited);
     }
 
     private Annotation[] parameterAnnotations(MappingMetadata mapping, int index) {
-        Map<Class<? extends Annotation>, Annotation> annotations = new LinkedHashMap<>();
         Set<Class<?>> hierarchy = new LinkedHashSet<>(List.of(mapping.controllerClass()));
         hierarchy.addAll(ClassUtils.getAllInterfacesForClassAsSet(mapping.controllerClass()));
 
@@ -545,6 +580,7 @@ public class OpenApiAnnotationParser {
             hierarchy.add(parent);
         }
 
+        Map<Class<? extends Annotation>, Annotation> annotations = new LinkedHashMap<>();
         for (Class<?> type : hierarchy) {
             Method[] candidates = type.getDeclaredMethods();
             for (Method candidate : candidates) {

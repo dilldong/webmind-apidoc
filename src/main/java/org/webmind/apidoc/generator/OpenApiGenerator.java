@@ -38,7 +38,7 @@ public class OpenApiGenerator {
         Info info = document.getInfo() == null ? new Info() : document.getInfo();
 
         if (StringUtils.isBlank(info.getTitle()))
-            info.setTitle("WebMind API");
+            info.setTitle("API");
 
         if (StringUtils.isBlank(info.getVersion()))
             info.setVersion("1.0.0");
@@ -68,6 +68,7 @@ public class OpenApiGenerator {
         String json = cachedJson;
         if (StringUtils.isEmpty(json))
             throw new IllegalStateException("OpenAPI document has not been generated yet");
+
         return json;
     }
 

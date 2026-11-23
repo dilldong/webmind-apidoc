@@ -43,14 +43,14 @@ public class OpenApiSchemaResolver {
     public synchronized Schema<?> resolve(Type type, Annotation[] annotations, Components components) {
         Objects.requireNonNull(type, "Java type must not be null");
         Objects.requireNonNull(components, "OpenAPI components must not be null");
-        if (type == void.class || type == Void.class) {
+        if (type == void.class || type == Void.class)
             return null;
-        }
 
         io.swagger.v3.oas.annotations.media.Schema schemaAnnotation = AnnotationsUtils.getSchemaAnnotation(annotations);
         boolean explicitImplementation = schemaAnnotation != null && schemaAnnotation.implementation() != Void.class;
         Type effectiveType = explicitImplementation ? schemaAnnotation.implementation() : type;
         Components localComponents = new Components();
+
         // Applying an implementation equal to the current target through ModelResolver's
         // override branch reenters the same converter context and is treated as a cycle.
         AnnotatedType annotatedType = new AnnotatedType(effectiveType)
@@ -75,27 +75,36 @@ public class OpenApiSchemaResolver {
             } else {
                 Type canonicalType = schemaAnnotation.implementation() == Void.class
                         ? type : schemaAnnotation.implementation();
+
                 Annotation[] canonicalAnnotations =
                         Arrays.stream(annotations)
                                 .filter(annotation -> !(annotation instanceof io.swagger.v3.oas.annotations.media.Schema))
                                 .toArray(Annotation[]::new);
+
                 AnnotatedType canonical = new AnnotatedType(canonicalType)
                         .ctxAnnotations(canonicalAnnotations)
                         .resolveAsRef(true)
                         .resolveEnumAsRef(schemaAnnotation.enumAsRef())
                         .components(localComponents);
-                if (!schemaAnnotation.name().isBlank()) canonical.name(schemaAnnotation.name());
+
+                if (!schemaAnnotation.name().isBlank())
+                    canonical.name(schemaAnnotation.name());
+
                 resolved = converters.resolveAsResolvedSchema(canonical);
             }
-            if (resolved.schema == null) {
+
+            if (resolved.schema == null)
                 throw new IllegalArgumentException("Cannot resolve OpenAPI schema for Java type: " + type.getTypeName());
-            }
-            resolved.schema = AnnotationsUtils.getSchemaFromAnnotation(schemaAnnotation, localComponents, null,
-                    true, resolved.schema).orElse(resolved.schema);
+
+            resolved.schema =
+                    AnnotationsUtils.getSchemaFromAnnotation(
+                                    schemaAnnotation, localComponents, null, true, resolved.schema)
+                            .orElse(resolved.schema);
         }
-        if (resolved.referencedSchemas != null) {
+
+        if (resolved.referencedSchemas != null)
             resolved.referencedSchemas.forEach(localComponents::addSchemas);
-        }
+
         mergeComponents(localComponents, components);
         return resolved.schema;
     }
@@ -108,20 +117,23 @@ public class OpenApiSchemaResolver {
     public synchronized void mergeComponents(Components source, Components target) {
         Objects.requireNonNull(source, "Source components must not be null");
         Objects.requireNonNull(target, "Target components must not be null");
+
         if (source.getSchemas() != null) {
             // Validate the entire batch before modifying the document. Different DTOs may
             // otherwise silently overwrite each other when their simple names match.
             source.getSchemas().forEach((name, schema) -> {
                 Schema<?> existing = target.getSchemas() == null ? null : target.getSchemas().get(name);
+
                 if (existing != null && !existing.equals(schema)) {
                     throw new IllegalArgumentException("Conflicting OpenAPI schema name '" + name
                             + "'; give the DTOs unique @Schema(name = ...) values");
                 }
             });
+
             source.getSchemas().forEach((name, schema) -> {
-                if (target.getSchemas() == null || !target.getSchemas().containsKey(name)) {
+                if (target.getSchemas() == null || !target.getSchemas().containsKey(name))
                     target.addSchemas(name, schema);
-                }
+
             });
         }
     }

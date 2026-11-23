@@ -16,6 +16,14 @@ public class Application {
 }
 ```
 
+`webmind.apidoc.enabled` 是启动开关，缺省为 `true`。生产环境设为 `false` 后，适配器会跳过文档扫描和生成，并移除 `/v3/api-docs` 的路由。
+
+```sh
+java -Dwebmind.apidoc.enabled=false -jar host.jar
+```
+
+部署平台也可设置环境变量 `WEBMIND_APIDOC_ENABLED=false`。若宿主通过 `@PropertySource` 加载配置文件，在该文件中设置 `webmind.apidoc.enabled=false`，并在导入适配器的宿主配置上声明 `@PropertySource`。
+
 启动流程统一放在 `WebMindMappingScanner.afterSingletonsInstantiated()`：
 
 ```text
@@ -26,7 +34,7 @@ public class Application {
     → 生成并缓存 OpenAPI 3.1 JSON
 ```
 
-本模块实现扫描、路由解析、注解解析、Schema 解析和文档生成；HTTP 文档端点及 Swagger UI 由应用接入。
+本模块解析 WebMind 路由和 Swagger 注解，生成 OpenAPI 文档并通过 `GET /v3/api-docs` 提供 JSON。宿主应用可接入 Swagger UI 读取该地址。
 
 ## 注解示例
 
