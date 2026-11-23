@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import lombok.AllArgsConstructor;
 import org.mind.framework.annotation.Mapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -35,7 +36,7 @@ public class TestEndpoint {
     @Mapping(value = {"/account1/${id}", "/account2/${id}"}, method = RequestMethod.GET)
     @Operation(operationId = "lookupAccount", summary = "Look up an account")
     public Account lookup2(long accountIdentifier) {
-        return new Account();
+        return new Account("Joe: "+ accountIdentifier);
     }
 
     @Mapping(value = {"/lookup/${id}"}, method = RequestMethod.GET)
@@ -131,6 +132,7 @@ public class TestEndpoint {
         public String second;
     }
 
+    @AllArgsConstructor
     public static class Account {
         public String name;
     }

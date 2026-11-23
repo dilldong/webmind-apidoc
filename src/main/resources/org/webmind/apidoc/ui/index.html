@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API Console</title>
+    <link rel="stylesheet" href="./api-docs/assets/styles">
+    <script defer src="./api-docs/assets/jquery"></script>
+    <script defer src="./api-docs/assets/openapi"></script>
+    <script defer src="./api-docs/assets/history"></script>
+    <script defer src="./api-docs/assets/console"></script>
+</head>
+<body class="min-h-screen bg-canvas text-ink antialiased">
+<header class="topbar">
+    <div class="topbar-inner">
+        <div class="flex min-w-0 items-center gap-3">
+            <span class="brand-mark" aria-hidden="true">API</span>
+            <div class="min-w-0">
+                <div class="brand-name"><span>API Console</span></div>
+                <p id="document-title" class="document-title" hidden></p>
+            </div>
+        </div>
+        <div class="topbar-actions">
+            <button type="button" id="configure-global-header" class="topbar-link global-header-button" aria-haspopup="dialog">全局请求头</button>
+            <span id="spec-version" class="spec-version" hidden></span>
+        </div>
+    </div>
+</header>
+
+<div class="workspace-layout">
+    <aside class="navigation" aria-label="接口与历史">
+        <div class="navigation-tabs">
+            <button type="button" class="navigation-tab is-active" data-navigation="operations" aria-pressed="true">接口<span id="operation-count" class="count" hidden></span></button>
+            <button type="button" class="navigation-tab" data-navigation="history" aria-pressed="false">请求历史</button>
+        </div>
+        <section id="nav-operations" class="navigation-pane" aria-label="接口列表">
+            <label class="sr-only" for="endpoint-search">搜索接口</label>
+            <input id="endpoint-search" class="field search-field" type="search" placeholder="搜索路径、名称或标签" autocomplete="off">
+            <div id="endpoint-group-actions" class="endpoint-group-actions" hidden>
+                <button type="button" class="text-button" data-endpoint-groups="expand" aria-controls="endpoint-list">全部展开</button>
+                <button type="button" class="text-button" data-endpoint-groups="collapse" aria-controls="endpoint-list">全部折叠</button>
+            </div>
+            <div id="endpoint-list" class="navigation-list"></div>
+            <p id="endpoint-empty" class="nav-empty">正在读取接口…</p>
+        </section>
+        <section id="nav-history" class="navigation-pane" aria-label="请求历史列表" hidden>
+            <div class="history-toolbar">
+                <p>保存在当前浏览器</p>
+                <button type="button" id="clear-history" class="text-button" disabled>清空</button>
+            </div>
+            <div id="history-list" class="navigation-list"></div>
+            <p id="history-empty" class="nav-empty">暂无请求记录</p>
+            <div id="history-detail" class="history-detail" hidden>
+                <p id="history-detail-label"></p>
+                <button type="button" id="delete-history" class="text-button">删除此记录</button>
+            </div>
+        </section>
+    </aside>
+
+    <main class="workspace" aria-label="请求调试">
+        <div id="load-state" class="card load-state" role="status">
+            <p id="load-message" class="font-medium">正在加载 OpenAPI 文档…</p>
+            <button type="button" id="retry-load" class="button secondary-button" hidden>重新加载</button>
+        </div>
+        <div id="operation-workspace" hidden>
+            <header class="operation-heading">
+                <div class="operation-heading-meta">
+                    <span id="operation-method" class="method-badge"></span>
+                    <code id="operation-path" class="operation-path"></code>
+                </div>
+                <h1 id="operation-title" class="operation-title"></h1>
+                <p id="operation-description" class="operation-description" hidden></p>
+                <p id="restore-notice" class="restore-notice" role="status" hidden></p>
+            </header>
+
+            <div class="workbench">
+                <section class="card min-w-0" aria-labelledby="request-heading">
+                    <form id="request-form" novalidate>
+                        <div class="card-header">
+                            <div>
+                                <h2 id="request-heading" class="card-title">请求</h2>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" class="button secondary-button" id="cancel-request" hidden>取消</button>
+                                <button type="submit" class="button primary-button" id="send-request">发送请求</button>
+                            </div>
+                        </div>
+                        <div class="request-target">
+                            <label class="field-label" for="server-select">服务地址</label>
+                            <select id="server-select" class="field"></select>
+                            <code id="request-url" class="request-url" aria-label="请求 URL"></code>
+                        </div>
+                        <div class="panel-tabs" aria-label="请求配置">
+                            <button type="button" class="panel-tab is-active" data-request-tab="parameters" aria-pressed="true">参数</button>
+                            <button type="button" class="panel-tab" data-request-tab="headers" aria-pressed="false">请求头</button>
+                            <button type="button" class="panel-tab" data-request-tab="body" aria-pressed="false">请求体</button>
+                        </div>
+                        <div id="request-parameters" class="panel-body">
+                            <div id="parameter-fields"></div>
+                            <div id="query-fields"></div>
+                            <button type="button" id="add-query" class="text-button add-field">添加查询参数</button>
+                        </div>
+                        <div id="request-headers" class="panel-body" hidden>
+                            <div id="header-fields"></div>
+                            <div id="extra-header-fields"></div>
+                            <button type="button" id="add-header" class="text-button add-field">添加请求头</button>
+                            <p id="cookie-notice" class="field-help mt-3" hidden></p>
+                        </div>
+                        <div id="request-body" class="panel-body" hidden>
+                            <p id="body-unavailable" class="field-help" hidden>当前方法不支持浏览器请求体。</p>
+                            <div id="body-fields">
+                                <div class="body-toolbar">
+                                    <label class="grow" for="body-type"><span class="field-label">Content-Type</span><select id="body-type" class="field"></select></label>
+                                    <button type="button" id="insert-example" class="button secondary-button" hidden>填入示例</button>
+                                </div>
+                                <label class="field-label mt-4" for="body-input" id="body-label">请求体</label>
+                                <textarea id="body-input" class="field body-editor" rows="9" spellcheck="false"></textarea>
+                                <p id="body-help" class="field-help mt-2" hidden></p>
+                                <details id="request-field-descriptions" class="schema-detail" hidden>
+                                    <summary>请求字段说明</summary>
+                                    <div class="schema-field-groups"></div>
+                                </details>
+                                <details id="body-schema" class="schema-detail" hidden>
+                                    <summary>查看请求模型</summary>
+                                    <pre id="body-schema-code" class="schema-code"></pre>
+                                </details>
+                            </div>
+                        </div>
+                        <p id="request-error" class="error-message" role="alert" hidden></p>
+                    </form>
+                </section>
+
+                <section class="card response-card min-w-0" aria-labelledby="response-heading">
+                    <div class="card-header">
+                        <div>
+                            <h2 id="response-heading" class="card-title">响应</h2>
+                            <p id="response-meta" class="card-subtitle" aria-live="polite">等待发送请求</p>
+                        </div>
+                        <span id="response-status" class="response-status" hidden></span>
+                    </div>
+                    <div class="panel-tabs" aria-label="响应查看">
+                        <button type="button" class="panel-tab is-active" data-response-tab="content" aria-pressed="true">响应体</button>
+                        <button type="button" class="panel-tab" data-response-tab="headers" aria-pressed="false">响应头</button>
+                        <button type="button" class="panel-tab" data-response-tab="docs" aria-pressed="false">响应文档</button>
+                    </div>
+                    <div id="response-content" class="response-content">
+                        <div class="result-toolbar" id="result-actions" hidden>
+                            <span id="response-type" class="response-type"></span>
+                            <span class="grow"></span>
+                            <button type="button" class="text-button" id="copy-response" hidden>复制</button>
+                            <button type="button" class="text-button" id="download-response" hidden>下载</button>
+                        </div>
+                        <p id="response-empty" class="response-empty">发送请求后，响应内容会显示在这里。</p>
+                        <pre id="response-code" class="response-code" tabindex="0" hidden></pre>
+                        <p id="response-note" class="response-note" hidden></p>
+                        <details id="response-field-descriptions" class="schema-detail" hidden>
+                            <summary>响应字段说明</summary>
+                            <div class="schema-field-groups"></div>
+                        </details>
+                    </div>
+                    <div id="response-headers" class="panel-body" hidden>
+                        <dl id="response-header-list" class="response-header-list"></dl>
+                        <p id="response-headers-empty" class="field-help">暂无可读取的响应头。</p>
+                    </div>
+                    <div id="response-docs" class="panel-body" hidden>
+                        <div id="response-doc-list"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+</div>
+
+<dialog id="global-header-dialog" class="settings-dialog" aria-labelledby="global-header-heading">
+    <form id="global-header-form" class="settings-form" novalidate>
+        <header>
+            <h2 id="global-header-heading" class="card-title">全局请求头</h2>
+            <p class="field-help mt-1">应用于 <code id="global-header-origin" class="break-all"></code></p>
+        </header>
+        <div>
+            <div class="extra-row field-label" aria-hidden="true"><span>名称</span><span>值</span><span></span></div>
+            <div id="global-header-fields"></div>
+            <button type="button" id="add-global-header" class="text-button add-field">添加请求头</button>
+        </div>
+        <p class="field-help">配置保存在当前浏览器，重新打开后可继续使用。同名请求头可在单次请求中覆盖。</p>
+        <p id="global-header-error" class="settings-error" role="alert" hidden></p>
+        <footer class="settings-actions">
+            <button type="button" id="clear-global-header" class="text-button mr-auto" hidden>清除配置</button>
+            <button type="button" id="cancel-global-header" class="button secondary-button">取消</button>
+            <button type="submit" class="button primary-button">保存</button>
+        </footer>
+    </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<noscript><p class="noscript-error">请启用 JavaScript 后使用 API 调试台。</p></noscript>
+</body>
+</html>

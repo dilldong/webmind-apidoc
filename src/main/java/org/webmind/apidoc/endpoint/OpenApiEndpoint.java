@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mind.framework.annotation.Mapping;
+import org.mind.framework.util.JsonUtils;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -27,10 +28,11 @@ public class OpenApiEndpoint {
     @Hidden
     public String apiDocs() {
         try {
+//            return FileUtils.read("/Users/marcus/Downloads/duova-openapi.json");
             return openApiGenerator.getJson();
         } catch (IllegalStateException e) {
             log.warn("[OpenAPI] {} - {}", e.getMessage(), "/v3/api-docs");
-            return null;
+            return JsonUtils.EMPTY_JSON_OBJECT;
         }
     }
 }

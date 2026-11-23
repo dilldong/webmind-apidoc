@@ -16,7 +16,7 @@ public class Application {
 }
 ```
 
-`webmind.apidoc.enabled` 是启动开关，缺省为 `true`。生产环境设为 `false` 后，适配器会跳过文档扫描和生成，并移除 `/v3/api-docs` 的路由。
+`webmind.apidoc.enabled` 是启动开关，缺省为 `true`。生产环境设为 `false` 后，适配器会跳过文档扫描和生成，关闭 `/v3/api-docs` 和 `/api-docs` 路由。
 
 ```sh
 java -Dwebmind.apidoc.enabled=false -jar host.jar
@@ -34,7 +34,25 @@ java -Dwebmind.apidoc.enabled=false -jar host.jar
     → 生成并缓存 OpenAPI 3.1 JSON
 ```
 
-本模块解析 WebMind 路由和 Swagger 注解，生成 OpenAPI 文档并通过 `GET /v3/api-docs` 提供 JSON。宿主应用可接入 Swagger UI 读取该地址。
+本模块解析 WebMind 路由和 Swagger 注解，生成 OpenAPI 文档并通过 `GET /v3/api-docs` 提供 JSON。
+
+## API 调试台
+
+启动宿主后打开 `/api-docs`。部署到 context path 下时，将该路径加在 `/api-docs` 前。页面随 JAR 分发，使用 Tailwind CSS 4.1.18 和 jQuery 4.0.0。
+
+- 接口按 OpenAPI 标签分组，默认折叠，可一键全部展开或折叠。搜索时自动展开匹配分组。使用 `@Tag(name = "用户管理")` 或 `@Operation(tags = "用户管理")` 指定分组。多个标签的接口会出现在相应的每个分组中，未设标签的接口归入「未分组」。
+- 选择接口后，可以编辑路径参数、查询参数、请求头及请求体。请求体支持 JSON、纯文本、XML 和表单文本字段。
+- 如果文档提供了字段说明，请求模型上方和响应体下方会出现可展开的说明。响应返回后会优先使用对应状态码和媒体类型的文档。
+- 点击「全局请求头」，可以明文添加、修改或删除多组名称和值。配置存入当前浏览器的 `localStorage`，关闭后重新打开 `/api-docs` 也可恢复。选择同源服务的接口时，「请求头」栏会自动填入同名字段，并将其余全局请求头显示为额外行。可以在该栏为单次请求改值。携带全局值的请求遇到重定向时会停止。
+- 手动发送后显示状态、耗时、响应头和响应体。浏览器会把参数和完整响应存入 IndexedDB，可在「请求历史」查看、回填或删除。认证请求头和文档标记为 API key 的查询参数不写入历史。
+- 默认请求当前宿主。文档配置了 `servers` 时可选择服务地址，跨域请求由目标服务的 CORS 配置决定。
+
+修改页面样式后，用 [Tailwind CSS CLI](https://tailwindcss.com/docs/installation/tailwind-cli) 编译随 JAR 分发的 CSS。
+
+```sh
+tailwindcss -i src/main/resources/org/webmind/apidoc/ui/console.tailwind.css \
+  -o src/main/resources/org/webmind/apidoc/ui/console.css --minify
+```
 
 ## 注解示例
 
