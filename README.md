@@ -1,5 +1,5 @@
 # webmind-apidoc
-[![License](https://img.shields.io/github/license/dilldong/webmind-apidoc)](https://raw.githubusercontent.com/dilldong/webmind-apidoc/master/LICENSE)
+[![License](https://img.shields.io/github/license/dilldong/webmind-apidoc)](https://github.com/dilldong/webmind-apidoc/blob/main/LICENSE)
 [![Maven2.0](https://img.shields.io/badge/maven-build-blue)](https://mvnrepository.com/artifact/io.github.dilldong/webmind-apidoc)
 
 Add OpenAPI Adapter support for WebMind, using Swagger Core under the hood.
