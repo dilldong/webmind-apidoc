@@ -19,6 +19,11 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+/**
+ * @author marcus
+ * @version 1.0
+ * @date 2026/11/24
+ */
 @Hidden
 @Controller
 @Conditional(OpenApiEnabledCondition.class)
@@ -52,17 +57,19 @@ public class OpenApiUiEndpoint {
 
     private Render assetResponse(Asset asset) {
         try {
-            String content =
-                    new ClassPathResource(UI_DIRECTORY + asset.fileName())
-                            .getContentAsString(StandardCharsets.UTF_8);
+            String content = new ClassPathResource(
+                    UI_DIRECTORY + asset.fileName(), OpenApiUiEndpoint.class.getClassLoader())
+                    .getContentAsString(StandardCharsets.UTF_8);
 
             Render render = ViewResolver.text(content);
             render.setContentType(asset.contentType());
             return render;
+
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot load API console asset " + asset.fileName(), e);
+            throw new UncheckedIOException("Cannot load API console asset: " + asset.fileName(), e);
         }
     }
 
-    private record Asset(String fileName, String contentType) {}
+    private record Asset(String fileName, String contentType) {
+    }
 }

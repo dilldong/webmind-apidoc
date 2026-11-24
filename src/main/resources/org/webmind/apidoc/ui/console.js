@@ -580,7 +580,6 @@
                 return;
             }
             $("#result-actions").prop("hidden", false);
-            $("#response-type").text(record.mediaType || "未声明媒体类型");
             $("#copy-response").prop("hidden", true);
             $("#download-response").prop("hidden", !blob?.size);
             if (!blob?.size) {

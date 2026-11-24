@@ -1,6 +1,7 @@
 package org.webmind.apidoc;
 
 import org.junit.jupiter.api.Test;
+import org.mind.framework.web.renderer.TextRender;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.webmind.apidoc.endpoint.OpenApiEndpoint;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +29,23 @@ class WebMindOpenApiConfigurationTest {
                 assertEquals("text/javascript", ui.asset(script).getContentType());
             }
             assertFalse(context.getBean(OpenApiGenerator.class).getOpenAPI().getPaths().containsKey("/api-docs"));
+        }
+    }
+
+    @Test
+    void servesAssetsWithAnIsolatedRequestClassLoader() {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        try {
+            thread.setContextClassLoader(ClassLoader.getPlatformClassLoader());
+
+            OpenApiUiEndpoint ui = new OpenApiUiEndpoint();
+            TextRender page = assertInstanceOf(TextRender.class, ui.page());
+            TextRender script = assertInstanceOf(TextRender.class, ui.asset("console"));
+            assertTrue(page.getText().contains("<title>API Console</title>"));
+            assertTrue(script.getText().contains("WebMindOpenApi"));
+        } finally {
+            thread.setContextClassLoader(previous);
         }
     }
 
