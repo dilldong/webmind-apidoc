@@ -32,11 +32,11 @@ public class OpenApiUiEndpoint {
     private static final String JAVASCRIPT = "text/javascript";
 
     private static final Map<String, Asset> ASSETS = Map.of(
-            "styles", new Asset("console.css", "text/css"),
+            "styles", new Asset("console.min.css", "text/css"),
             "jquery", new Asset("jquery.min.js", JAVASCRIPT),
-            "openapi", new Asset("openapi.js", JAVASCRIPT),
-            "history", new Asset("history.js", JAVASCRIPT),
-            "console", new Asset("console.js", JAVASCRIPT)
+            "openapi", new Asset("openapi.min.js", JAVASCRIPT),
+            "history", new Asset("history.min.js", JAVASCRIPT),
+            "console", new Asset("console.min.js", JAVASCRIPT)
     );
 
     @Mapping(value = "/api-docs", method = RequestMethod.GET, requestLog = false)

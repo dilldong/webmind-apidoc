@@ -20,6 +20,12 @@
         </license>
     </licenses>
 
+    <scm>
+        <url>https://github.com/dilldong/webmind-apidoc</url>
+        <connection>scm:git:git@github.com:dilldong/webmind-apidoc.git</connection>
+        <developerConnection>scm:git:git@github.com:dilldong/webmind-apidoc.git</developerConnection>
+    </scm>
+
     <developers>
         <developer>
             <name>Marcus Tg</name>
@@ -35,6 +41,35 @@
     </properties>
 
     <build>
+        <finalName>${project.artifactId}-${project.version}</finalName>
+
+        <resources>
+            <resource>
+                <directory>META-INF</directory>
+                <targetPath>META-INF</targetPath>
+                <includes>
+                    <include>**/**</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>org/webmind/apidoc/generator/version.txt</exclude>
+                    <exclude>org/webmind/apidoc/ui/console.tailwind.css</exclude>
+                    <exclude>org/webmind/apidoc/ui/console.js</exclude>
+                    <exclude>org/webmind/apidoc/ui/history.js</exclude>
+                    <exclude>org/webmind/apidoc/ui/openapi.js</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>org/webmind/apidoc/generator/version.txt</include>
+                </includes>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.sonatype.central</groupId>
@@ -59,11 +94,6 @@
                         <arg>-Xlint:deprecation</arg>
                     </compilerArgs>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.4</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

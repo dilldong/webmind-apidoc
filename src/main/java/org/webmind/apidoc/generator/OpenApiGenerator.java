@@ -8,7 +8,10 @@ import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.SpecVersion;
 import io.swagger.v3.oas.models.info.Info;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
@@ -19,6 +22,7 @@ import java.util.Objects;
  */
 public class OpenApiGenerator {
     private static final String API_VERSION = "3.1.0";
+    private static final String PROJECT_VERSION = readProjectVersion();
     private final String definitionJson;
     private volatile String cachedJson;
 
@@ -38,10 +42,10 @@ public class OpenApiGenerator {
         Info info = document.getInfo() == null ? new Info() : document.getInfo();
 
         if (StringUtils.isBlank(info.getTitle()))
-            info.setTitle("API");
+            info.setTitle("WebMind API");
 
         if (StringUtils.isBlank(info.getVersion()))
-            info.setVersion("1.0.0");
+            info.setVersion(PROJECT_VERSION);
 
         document.setInfo(info);
 
@@ -77,6 +81,16 @@ public class OpenApiGenerator {
      */
     public OpenAPI getOpenAPI() {
         return deserialize(getJson());
+    }
+
+    private static String readProjectVersion() {
+        try {
+            String version = new ClassPathResource("version.txt", OpenApiGenerator.class)
+                    .getContentAsString(StandardCharsets.UTF_8).strip();
+            return version.isEmpty() || "${project.version}".equals(version) ? "unknown" : version;
+        } catch (IOException e) {
+            return "unknown";
+        }
     }
 
     private static String serialize(OpenAPI document) {
