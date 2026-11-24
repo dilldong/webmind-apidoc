@@ -10,7 +10,7 @@
     <description>Add OpenAPI Adapter support for WebMind, using Swagger Core under the hood.</description>
     <url>https://github.com/dilldong/webmind-apidoc</url>
     <packaging>jar</packaging>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 
     <licenses>
         <license>
