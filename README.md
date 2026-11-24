@@ -1,11 +1,30 @@
 # webmind-apidoc
+[![License](https://img.shields.io/github/license/dilldong/webmind-apidoc)](https://github.com/dilldong/webmind-apidoc/blob/main/LICENSE)
+[![Maven2.0](https://img.shields.io/badge/maven-build-blue)](https://mvnrepository.com/artifact/io.github.dilldong/webmind-apidoc)
+
 Add OpenAPI Adapter support for WebMind, using Swagger Core under the hood.
 
 ## 使用
+```text
+Java 17+
+Swagger Core Jakarta 2.2.55
+```
 
-要求 Java 17+。使用 Swagger Core Jakarta 2.2.55。
+## Maven
+Add the following Maven dependency to your project's pom.xml
+```xml
+<dependency>
+    <groupId>io.github.dilldong</groupId>
+    <artifactId>webmind-apidoc</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+## Gradle
+```text
+implementation 'io.github.dilldong:webmind-apidoc:1.0.0'
+```
 
-在应用配置上导入适配器：
+## 在应用配置上导入适配器：
 
 ```java
 @Import(WebMindOpenApiConfiguration.class)
@@ -16,16 +35,18 @@ public class Application {
 }
 ```
 
-`webmind.apidoc.enabled` 是启动开关，缺省为 `true`。生产环境设为 `false` 后，适配器会跳过文档扫描和生成，关闭 `/v3/api-docs` 和 `/api-docs` 路由。
+## 启动开关
+`webmind.apidoc.enabled` 缺省为 `true`，建议生产环境设为 `false`，关闭 `/v3/api-docs` 和 `/api-docs` 路由。
+
 
 ```sh
-java -Dwebmind.apidoc.enabled=false -jar host.jar
+java -Dwebmind.apidoc.enabled=false -jar app.jar
 ```
+### or
 
 部署平台也可设置环境变量 `WEBMIND_APIDOC_ENABLED=false`。若宿主通过 `@PropertySource` 加载配置文件，在该文件中设置 `webmind.apidoc.enabled=false`，并在导入适配器的宿主配置上声明 `@PropertySource`。
 
-启动流程统一放在 `WebMindMappingScanner.afterSingletonsInstantiated()`：
-
+## 原理
 ```text
 扫描 Controller / @Mapping
     → 解析路径和 HTTP 方法
@@ -34,9 +55,7 @@ java -Dwebmind.apidoc.enabled=false -jar host.jar
     → 生成并缓存 OpenAPI 3.1 JSON
 ```
 
-本模块解析 WebMind 路由和 Swagger 注解，生成 OpenAPI 文档并通过 `GET /v3/api-docs` 提供 JSON。
-
-## 注解示例
+## 示例
 
 ```java
 @Controller
